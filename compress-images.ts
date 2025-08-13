@@ -3,8 +3,6 @@ const path = require('path');
 const fs = require('fs');
 
 const images = [
-  { filename: 'casino-banner.webp', width: 800, quality: 85, format: 'webp' },
-  { filename: 'card-img.png', width: 600, quality: 70, format: 'jpg' },
   { filename: 'logo.png', width: 600, quality: 70, format: 'webp' },
 ];
 
