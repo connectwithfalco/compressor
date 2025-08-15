@@ -27,6 +27,8 @@
               }
             ],
             "styles": [
+              "node_modules/primeflex/primeflex.css",
+              "node_modules/primeicons/primeicons.css",
               "src/styles.scss"
             ],
             "server": "src/main.server.ts",

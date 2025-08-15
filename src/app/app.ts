@@ -2,12 +2,13 @@ import { Component } from '@angular/core';
 import { ImageUploadService } from './services/image-upload-service';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NgIf } from '@angular/common';
+import { Form } from './form/form';
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule, ReactiveFormsModule, NgIf],
+  imports: [FormsModule, ReactiveFormsModule, NgIf, Form],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
 export class App {
   protected title = 'compressor';
@@ -18,7 +19,7 @@ export class App {
   format = 'webp';
   comLevel = 6; // default max compression
 
-  constructor(private imageService: ImageUploadService) { }
+  constructor(private imageService: ImageUploadService) {}
 
   onFileSelected(event: any) {
     this.selectedFile = event.target.files[0];
@@ -31,7 +32,13 @@ export class App {
     }
 
     this.imageService
-      .uploadImage(this.selectedFile, this.width, this.quality, this.format, this.comLevel) // <-- added comLevel
+      .uploadImage(
+        this.selectedFile,
+        this.width,
+        this.quality,
+        this.format,
+        this.comLevel
+      ) // <-- added comLevel
       .subscribe((blob: Blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');

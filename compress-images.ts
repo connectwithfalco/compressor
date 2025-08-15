@@ -6,8 +6,8 @@ const images = [
   { filename: 'logo.png', width: 600, quality: 70, format: 'webp' },
 ];
 
-const inputDir = path.resolve(__dirname, './public/assets/images');
-const outputDir = path.resolve(__dirname, './public/assets/images/compressed');
+const inputDir = path.resolve(__dirname, './public/chips');
+const outputDir = path.resolve(__dirname, './public/compressed');
 
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir);

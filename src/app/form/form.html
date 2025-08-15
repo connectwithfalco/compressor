@@ -1,0 +1,114 @@
+<div class="flex justify-content-center mt-5">
+  <form
+    [formGroup]="imageForm"
+    (ngSubmit)="submitForm()"
+    class="formgrid grid p-fluid shadow-3 p-4 border-round"
+    style="max-width: 600px; width: 100%"
+  >
+    <!-- Image Upload -->
+    <div class="field col-12">
+      <label for="image" class="block mb-2 font-medium">Upload Image</label>
+      <p-fileUpload
+        #fileUpload
+        mode="basic"
+        name="image"
+        accept="image/*"
+        (onSelect)="onFileChange($event)"
+        chooseLabel="Choose Image"
+        class="w-full"
+      ></p-fileUpload>
+      <p-message
+        *ngIf="
+          imageForm.get('image')?.touched && imageForm.get('image')?.invalid
+        "
+        severity="error"
+        size="small"
+        variant="simple"
+      >
+        Please upload an image.
+      </p-message>
+    </div>
+
+    <!-- Width -->
+    <div class="field col-12 md:col-6">
+      <p-floatlabel variant="on">
+        <p-inputNumber
+        id="width"
+        formControlName="width"
+        [showButtons]="false"
+        class="w-full"
+        ></p-inputNumber>
+        <label for="width">Width</label>
+      </p-floatlabel>
+      <p-message
+        *ngIf="
+          imageForm.get('width')?.touched && imageForm.get('width')?.invalid
+        "
+        severity="error"
+        size="small"
+        variant="simple"
+      >
+        Please enter a valid width.
+      </p-message>
+    </div>
+
+    <!-- Height -->
+    <div class="field col-12 md:col-6">
+      <p-floatlabel variant="on">
+        <p-inputNumber
+          id="height"
+          formControlName="height"
+          [showButtons]="false"
+          class="w-full"
+        ></p-inputNumber>
+        <label for="height">Height</label>
+      </p-floatlabel>
+      <p-message
+        *ngIf="
+          imageForm.get('height')?.touched && imageForm.get('height')?.invalid
+        "
+        severity="error"
+        size="small"
+        variant="simple"
+      >
+        Please enter a valid height.
+      </p-message>
+    </div>
+
+    <!-- Format -->
+    <div class="field col-12">
+      <p-floatlabel variant="on">
+        <p-select
+          id="format"
+          formControlName="format"
+          [options]="formatOptions"
+          optionLabel="label"
+          optionValue="value"
+          class="w-full"
+        ></p-select>
+        <label for="format">Select Format</label>
+      </p-floatlabel>
+      <p-message
+        *ngIf="
+          imageForm.get('format')?.touched && imageForm.get('format')?.invalid
+        "
+        severity="error"
+        size="small"
+        variant="simple"
+      >
+        Please select a format.
+      </p-message>
+    </div>
+
+    <!-- Submit Button -->
+    <div class="col-12 flex justify-content-center mt-3">
+      <p-button
+        type="submit"
+        label="Submit"
+        icon="pi pi-check"
+        [loading]="isSubmitting"
+        class="px-5"
+      ></p-button>
+    </div>
+  </form>
+</div>
