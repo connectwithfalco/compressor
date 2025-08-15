@@ -9,6 +9,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { join, extname, basename } from 'node:path';
 import fs from 'node:fs';
+import Potrace from 'oslllo-potrace';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 const upload = multer({ dest: 'uploads/' });
@@ -21,7 +22,13 @@ if (!fs.existsSync(outputDir)) {
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
-// --- API ENDPOINT for image compression ---
+async function rasterToSvg(inputPath: string, outputPath: string) {
+  const pngBuffer = await sharp(inputPath).png().toBuffer();
+  const svg = await Potrace(pngBuffer).trace();
+  fs.writeFileSync(outputPath, svg);
+}
+
+// --- API ENDPOINT for image upload/compression ---
 app.post('/api/upload', upload.single('image'), async (req: any, res: any) => {
   try {
     const { width = 600, quality = 70, format, comLevel = 9 } = req.body;
@@ -31,17 +38,22 @@ app.post('/api/upload', upload.single('image'), async (req: any, res: any) => {
     const finalFormat = (format || originalExt).toLowerCase();
     const outputPath = join(outputDir, `${baseName}.${finalFormat}`);
 
-    // --- SVG handling (pass-through, no rasterization) ---
-    if (originalExt === 'svg' || finalFormat === 'svg') {
-      fs.copyFileSync(inputPath, outputPath);
+    // --- SVG handling ---
+    if (finalFormat === 'svg') {
+      if (originalExt === 'svg') {
+        // Already SVG → just copy
+        fs.copyFileSync(inputPath, outputPath);
+      } else {
+        // Raster → convert to SVG
+        await rasterToSvg(inputPath, outputPath);
+      }
       fs.unlinkSync(inputPath);
       return res.download(outputPath, `${baseName}.svg`);
     }
 
-    // Initialize sharp
+    // --- Raster image processing (jpg/png/webp) ---
     let transformer = sharp(inputPath).resize(parseInt(width));
 
-    // --- Format-specific compression ---
     switch (finalFormat) {
       case 'jpg':
       case 'jpeg':
@@ -58,28 +70,21 @@ app.post('/api/upload', upload.single('image'), async (req: any, res: any) => {
       case 'webp':
         transformer = transformer.webp({
           quality: parseInt(quality),
-          effort: parseInt(comLevel), // WebP equivalent to compressionLevel
+          effort: parseInt(comLevel),
         });
         break;
-
-      case 'svg': // Explicit case for output as SVG
-        fs.copyFileSync(inputPath, outputPath);
-        fs.unlinkSync(inputPath);
-        return res.download(outputPath, `${baseName}.svg`);
 
       default:
         return res.status(400).json({ error: 'Unsupported format' });
     }
 
-    // Save the compressed file
     await transformer.toFile(outputPath);
 
-    // Send back to client
     res.download(outputPath, `${baseName}.${finalFormat}`, () => {
-      fs.unlinkSync(inputPath); // cleanup original uploaded file
+      fs.unlinkSync(inputPath);
     });
   } catch (error) {
-    console.error('Error compressing image:', error);
+    console.error('Error processing image:', error);
     res.status(500).json({ error: 'Image processing failed' });
   }
 });
