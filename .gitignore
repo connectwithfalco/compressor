@@ -1,6 +1,6 @@
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# Compiled output.  12312312
+# Compiled output.  12312312 12312
 /dist
 /tmp
 /out-tsc
