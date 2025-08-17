@@ -1,88 +1,119 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  AngularNodeAppEngine,
+  createNodeRequestHandler,
+  isMainModule,
+  writeResponseToNodeResponse,
+} from '@angular/ssr/node';
+import express from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
+import { join, extname, basename } from 'node:path';
+import fs from 'node:fs';
 import Potrace from 'oslllo-potrace';
-import { extname, basename } from 'node:path';
 
-// Multer in-memory storage (no filesystem)
-const storage = multer.memoryStorage();
-const upload = multer({ storage }).single('image');
+const browserDistFolder = join(import.meta.dirname, '../browser');
+const upload = multer({ dest: 'uploads/' });
+const outputDir = join(process.cwd(), 'public/assets/images/compressed');
 
-function runMiddleware(req: VercelRequest, res: VercelResponse, fn: any) {
-  return new Promise((resolve, reject) => {
-    fn(req, res, (result: any) => {
-      if (result instanceof Error) return reject(result);
-      return resolve(result);
-    });
-  });
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true });
 }
 
-export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
+const app = express();
+const angularApp = new AngularNodeAppEngine();
 
+async function rasterToSvg(inputPath: string, outputPath: string) {
+  const pngBuffer = await sharp(inputPath).png().toBuffer();
+  const svg = await Potrace(pngBuffer).trace();
+  fs.writeFileSync(outputPath, svg);
+}
+
+// --- API ENDPOINT for image upload/compression ---
+app.post('/api/upload', upload.single('image'), async (req: any, res: any) => {
   try {
-    await runMiddleware(req, res, upload);
-
-    const { width = 600, quality = 70, format, comLevel = 9 } = req.body as any;
-
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-    const buffer = req.file.buffer;
+    const { width = 600, quality = 70, format, comLevel = 9 } = req.body;
+    const inputPath = req.file.path;
     const originalExt = extname(req.file.originalname).toLowerCase().replace('.', '');
     const baseName = basename(req.file.originalname, extname(req.file.originalname));
     const finalFormat = (format || originalExt).toLowerCase();
+    const outputPath = join(outputDir, `${baseName}.${finalFormat}`);
 
     // --- SVG handling ---
     if (finalFormat === 'svg') {
-      let svg: string;
       if (originalExt === 'svg') {
-        svg = buffer.toString();
+        // Already SVG → just copy
+        fs.copyFileSync(inputPath, outputPath);
       } else {
-        const pngBuffer = await sharp(buffer).png().toBuffer();
-        svg = await Potrace(pngBuffer).trace();
+        // Raster → convert to SVG
+        await rasterToSvg(inputPath, outputPath);
       }
-
-      res.setHeader('Content-Type', 'image/svg+xml');
-      return res.send(svg);
+      fs.unlinkSync(inputPath);
+      return res.download(outputPath, `${baseName}.svg`);
     }
 
-    // --- Raster (jpg/png/webp) ---
-    let transformer = sharp(buffer).resize(parseInt(width as string));
+    // --- Raster image processing (jpg/png/webp) ---
+    let transformer = sharp(inputPath).resize(parseInt(width));
 
     switch (finalFormat) {
       case 'jpg':
       case 'jpeg':
-        transformer = transformer.jpeg({ quality: parseInt(quality as string) });
-        res.setHeader('Content-Type', 'image/jpeg');
+        transformer = transformer.jpeg({ quality: parseInt(quality) });
         break;
 
       case 'png':
         transformer = transformer.png({
-          quality: parseInt(quality as string),
-          compressionLevel: parseInt(comLevel as string),
+          quality: parseInt(quality),
+          compressionLevel: parseInt(comLevel),
         });
-        res.setHeader('Content-Type', 'image/png');
         break;
 
       case 'webp':
         transformer = transformer.webp({
-          quality: parseInt(quality as string),
-          effort: parseInt(comLevel as string),
+          quality: parseInt(quality),
+          effort: parseInt(comLevel),
         });
-        res.setHeader('Content-Type', 'image/webp');
         break;
 
       default:
         return res.status(400).json({ error: 'Unsupported format' });
     }
 
-    const outBuffer = await transformer.toBuffer();
-    res.send(outBuffer);
+    await transformer.toFile(outputPath);
 
-  } catch (err: any) {
-    console.error('Upload error:', err);
+    res.download(outputPath, `${baseName}.${finalFormat}`, () => {
+      fs.unlinkSync(inputPath);
+    });
+  } catch (error) {
+    console.error('Error processing image:', error);
     res.status(500).json({ error: 'Image processing failed' });
   }
+});
+
+// Serve static files
+app.use(
+  express.static(browserDistFolder, {
+    maxAge: '1y',
+    index: false,
+    redirect: false,
+  }),
+);
+
+// SSR catch-all
+app.use((req, res, next) => {
+  angularApp
+    .handle(req)
+    .then((response) =>
+      response ? writeResponseToNodeResponse(response, res) : next(),
+    )
+    .catch(next);
+});
+
+if (isMainModule(import.meta.url)) {
+  const port = process.env['PORT'] || 4000;
+  app.listen(port, (error) => {
+    if (error) throw error;
+    console.log(`Node Express server listening on http://localhost:${port}`);
+  });
 }
+
+export const reqHandler = createNodeRequestHandler(app);
